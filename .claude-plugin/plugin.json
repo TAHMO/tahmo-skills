@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "tahmo",
+  "displayName": "TAHMO Skills",
+  "description": "TAHMO weather-station data skills: fetch quality-controlled station observations from the TAHMO API as weather-skills Zarr stores.",
+  "author": {
+    "name": "TAHMO",
+    "url": "https://tahmo.org"
+  },
+  "homepage": "https://github.com/TAHMO/tahmo-skills",
+  "repository": "https://github.com/TAHMO/tahmo-skills",
+  "license": "MIT",
+  "keywords": [
+    "weather",
+    "climate",
+    "TAHMO",
+    "stations",
+    "observations",
+    "Africa",
+    "rainfall",
+    "zarr",
+    "xarray"
+  ],
+  "version": "2026.930.0"
+}
