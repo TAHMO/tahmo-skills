@@ -45,10 +45,8 @@ claude plugin install tahmo@tahmo-skills
 
 ## Layout
 
-This repo uses the same packaging model as
-[`chc-skills`](https://github.com/rhiza-research/chc-skills): canonical skills live
-under `skills/<name>/` (`SKILL.md`, `scripts/`, `tests/`, `references/`), the
-Claude plugin is defined by `.claude-plugin/` and `agents/`, and the CLI comes
-from `skills-runner`.
+Skills live under `skills/<name>/` (`SKILL.md`, `scripts/`, `tests/`,
+`references/`), the Claude plugin is defined by `.claude-plugin/` and
+`agents/`, and the CLI comes from `skills-runner`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
