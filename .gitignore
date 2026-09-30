@@ -1,0 +1,26 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code local state
+.claude
+
+# Python / uv
+uv.lock
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Credentials (TAHMO_API_USERNAME / TAHMO_API_PASSWORD)
+.env
+.env.*
+
+# Skill outputs from local runs
+*.zarr/
+*.png
