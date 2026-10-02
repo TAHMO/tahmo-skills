@@ -1,5 +1,5 @@
 ---
-name: tahmo-fetch
+name: observations
 description: Fetch quality-controlled TAHMO weather-station observations (rainfall, temperature incl. daily max/min, humidity, pressure, wind, radiation, soil) from the TAHMO API for chosen stations, countries, or a bbox, and write a point_obs weather-skills Zarr at daily, hourly, or native 5-minute resolution. Also lists the stations an account can access. Use when a task needs in-situ African station data, e.g. to compare against gridded satellite, reanalysis, or forecast data.
 license: MIT
 compatibility: Requires Python 3.12 and uv. Calls the TAHMO API v2 (https://datahub.tahmo.org) over HTTPS; requires TAHMO_API_USERNAME and TAHMO_API_PASSWORD in the environment.
@@ -33,7 +33,7 @@ metadata:
     primaryEnv: TAHMO_API_USERNAME
 ---
 
-# tahmo-fetch
+# observations
 
 Downloads observations from the Trans-African Hydro-Meteorological Observatory
 (TAHMO) station network through the TAHMO API v2 and writes a CF-1.13
@@ -116,7 +116,7 @@ Stations installed after `--end-time` are skipped automatically.
   observations of VARIABLE (default `precip`) at a few active stations in the
   selection, or `none`, and exit. No `-o`.
 
-### Variables
+## Variables
 
 | `-v` | TAHMO | Units out | Daily/hourly reduction |
 | --- | --- | --- | --- |
@@ -139,7 +139,7 @@ weather-skills units contract. At daily resolution the number equals the day's
 total in mm. At hourly or native resolution, multiply by the interval to get
 depth, or use `aggregate-temporal` and then `convert-to-totals`.
 
-### Output
+## Output
 
 A Zarr with dims `(time, station_id)` and coords `latitude`, `longitude`,
 `elevation` (m), `name`, `country` (ISO alpha-2), and `timezone` on
@@ -161,7 +161,7 @@ Global attrs record the settings (`tahmo_resolution`, `tahmo_min_coverage`,
 `tahmo_day_boundary`, …), `weather_skills_source=tahmo`, and
 `featureType=timeSeries`.
 
-### Failures
+## Failures
 
 - Missing or rejected credentials → exit 2 with a message; nothing is written.
 - Unknown station code or country → exit 2 and a list of what is available.
@@ -172,7 +172,7 @@ Global attrs record the settings (`tahmo_resolution`, `tahmo_min_coverage`,
 
 Transient errors (HTTP 429/5xx, timeouts) are retried with backoff.
 
-### Provenance
+## Provenance
 
 The decorator stamps `weather_skills_history` with this skill's name, version,
 and arguments. Inspect it with the `provenance` skill.

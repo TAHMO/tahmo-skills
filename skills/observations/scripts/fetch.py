@@ -39,7 +39,7 @@ from weather_skills_core.standard_utils import apply_write_encoding, require_env
 from weather_skills_core.units import precip_amounts_to_rates, stamp_data_interval
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.0"
+_SKILL_VERSION = "0.1.1"
 
 API_BASE_URL = "https://datahub.tahmo.org"
 STATIONS_PATH = "services/assets/v2/stations"
@@ -625,7 +625,7 @@ def _probe_latest(client, stations: pd.DataFrame, ident: str) -> str:
 # ------------------------------------------------------------------ skill
 
 
-@weather_skill(name="tahmo-fetch", version=_SKILL_VERSION)
+@weather_skill(name="observations", version=_SKILL_VERSION)
 @weather_skill.argument("--start-time", required=True)
 @weather_skill.argument("--end-time", required=True)
 @weather_skill.argument("--bbox")
@@ -924,7 +924,7 @@ def fetch(
         source=f"TAHMO API v2 ({API_BASE_URL}), {dataset} dataset",
         institution="Trans-African Hydro-Meteorological Observatory (TAHMO)",
         references="https://tahmo.org",
-        history=f"{now} tahmo-fetch {start_time}..{end_time} resolution={resolution}",
+        history=f"{now} observations {start_time}..{end_time} resolution={resolution}",
         weather_skills_source="tahmo",
         tahmo_dataset=dataset,
         tahmo_max_quality=np.int8(max_quality),
