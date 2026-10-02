@@ -625,7 +625,7 @@ def _probe_latest(client, stations: pd.DataFrame, ident: str) -> str:
 # ------------------------------------------------------------------ skill
 
 
-@weather_skill(name="tahmo-fetch", version=_SKILL_VERSION)
+@weather_skill(name="observations", version=_SKILL_VERSION)
 @weather_skill.argument("--start-time", required=True)
 @weather_skill.argument("--end-time", required=True)
 @weather_skill.argument("--bbox")
@@ -924,7 +924,7 @@ def fetch(
         source=f"TAHMO API v2 ({API_BASE_URL}), {dataset} dataset",
         institution="Trans-African Hydro-Meteorological Observatory (TAHMO)",
         references="https://tahmo.org",
-        history=f"{now} tahmo-fetch {start_time}..{end_time} resolution={resolution}",
+        history=f"{now} observations {start_time}..{end_time} resolution={resolution}",
         weather_skills_source="tahmo",
         tahmo_dataset=dataset,
         tahmo_max_quality=np.int8(max_quality),

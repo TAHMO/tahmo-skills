@@ -1,4 +1,4 @@
-"""Correctness tests for tahmo-fetch (fake TAHMO API; no live network)."""
+"""Correctness tests for observations (fake TAHMO API; no live network)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ COLUMNS = ["time", "quality", "sensor", "station", "value", "variable"]
 
 @pytest.fixture(scope="module")
 def mod():
-    return load_skill("tahmo-fetch", "fetch")
+    return load_skill("observations", "fetch")
 
 
 def _station(code, country, tz, lat=0.0, lon=36.0, status=1, installed="2018-01-01"):
@@ -192,7 +192,7 @@ def test_daily_utc_station_values_and_metadata(mod, tmp_path):
     assert ds.attrs["featureType"] == "timeSeries"
     assert ds.attrs["weather_skills_source"] == "tahmo"
     assert ds["precip"].attrs["data_interval"] == "1 day"
-    assert load_history(out)[-1]["skill"] == "tahmo-fetch"
+    assert load_history(out)[-1]["skill"] == "observations"
     # One request per (station, shortcode): te is shared by temperature/tmax/tmin.
     assert sorted(p["variable"] for _s, p in api.requests) == ["pr", "rh", "te"]
 

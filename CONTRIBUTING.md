@@ -36,7 +36,7 @@ publishes a lean plugin payload to `plugin-dist`. Bump kind comes from PR labels
 ## Local development against weather-skills-core
 
 ```bash
-tools/run_with_local_core.sh skills/tahmo-fetch/scripts/fetch.py --help
+tools/run_with_local_core.sh skills/observations/scripts/fetch.py --help
 ```
 
 Core is pinned to `main` in `pyproject.toml` and every
@@ -49,7 +49,7 @@ skill script's PEP 723 header.
 2. Keep each script self-contained. CI runs `--help` on every
    `scripts/*.py`, and every script in a skill must share one `_SKILL_VERSION`.
 3. Tests must not hit the network. Mock at the HTTP layer (see
-   `skills/tahmo-fetch/tests/`).
+   `skills/observations/tests/`).
 4. Add the skill to the table in `README.md` and to `agents/tahmo.md`.
 
 ## Live checks
@@ -61,5 +61,5 @@ exposes a few stations):
 
 ```bash
 TAHMO_API_USERNAME=... TAHMO_API_PASSWORD=... \
-  uv run skills/tahmo-fetch/scripts/fetch.py --list-stations
+  uv run skills/observations/scripts/fetch.py --list-stations
 ```
