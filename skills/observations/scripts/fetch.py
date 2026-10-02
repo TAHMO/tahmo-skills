@@ -39,7 +39,7 @@ from weather_skills_core.standard_utils import apply_write_encoding, require_env
 from weather_skills_core.units import precip_amounts_to_rates, stamp_data_interval
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.0"
+_SKILL_VERSION = "0.1.1"
 
 API_BASE_URL = "https://datahub.tahmo.org"
 STATIONS_PATH = "services/assets/v2/stations"
