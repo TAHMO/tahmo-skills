@@ -13,6 +13,7 @@ transforms and plotters (`aggregate-temporal`, `plot-compare`, …).
 | Skill | Role |
 | --- | --- |
 | [`observations`](skills/observations/) | List accessible stations, and fetch quality-controlled observations (rain, temperature incl. max/min, humidity, pressure, wind, radiation, soil) at daily, hourly, or native 5-min resolution into a point_obs Zarr |
+| [`observations-satellite-qc`](skills/observations-satellite-qc/) | Remove daily station rainfall that disagrees with NASA IMERG Early satellite estimates (absolute-difference, ratio, and wet/dry rules), keeping a per-day flag that records why |
 
 ## Quick start
 
@@ -32,6 +33,9 @@ uv run skills/observations/scripts/fetch.py --country KE \
 
 # Latest day with data
 uv run skills/observations/scripts/fetch.py --probe-latest --country KE
+
+# Remove days that disagree with IMERG satellite rainfall
+uv run skills/observations-satellite-qc/scripts/observations_satellite_qc.py -i kenya.zarr -o kenya_clean.zarr
 ```
 
 ## Install as a Claude plugin
