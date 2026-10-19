@@ -43,6 +43,7 @@ STATIONS = [
     _station("TA00001", "KE", "Africa/Nairobi", lat=-1.3, lon=36.8),
     _station("TA00002", "GH", "Africa/Accra", lat=5.6, lon=-0.2),
     _station("TA00003", "KE", "Africa/Nairobi", lat=0.5, lon=35.3, status=0),
+    _station("TE00017", "UG", "Africa/Kampala", lat=0.3, lon=32.6),  # Ecowitt (ARCUS)
 ]
 
 
@@ -345,3 +346,99 @@ def test_http_retries_then_auth_error(mod, monkeypatch):
     replies[:] = [Resp(422, {"error": {"message": "period too large"}})]
     with pytest.raises(mod.DataError, match="period too large"):
         client.get("services/measurements/v2/stations/TA1/measurements/controlled")
+
+
+# ----------------------------------------------------------------- Ecowitt (TE) rain
+
+
+def running_total(times, rain_per_reading, start=0.0, reset_after=None):
+    """Ecowitt-style event counter: cumulative rain, optionally reset to 0 at an index."""
+    total, values = start, []
+    for i, (_t, rain) in enumerate(zip(times, rain_per_reading, strict=True)):
+        if reset_after is not None and i == reset_after:
+            total = 0.0
+        total += rain
+        values.append(round(total, 4))
+    return [[t, 1, "S9", v] for t, v in zip(times, values, strict=True)]
+
+
+def test_looks_like_counter(mod):
+    rising = np.concatenate([np.full(10, 1.0), np.linspace(1, 20, 40), np.full(20, 20.0), [0, 0]])
+    assert mod.looks_like_counter(rising) is True
+    bursty = np.tile([0.0, 0.2, 0.4, 0.1, 0.0, 0.3], 20)  # ATMOS 41 style: falls after rain
+    assert mod.looks_like_counter(bursty) is False
+    assert mod.looks_like_counter([0.0, 0.2, 0.4]) is None  # too little rain to tell
+
+
+def test_counter_to_increments_rises_holds_and_resets(mod):
+    times = five_min("2025-01-01", "2025-01-01T00:35")
+    raw = pd.DataFrame(
+        [[t.strftime("%Y-%m-%dT%H:%M:%SZ"), v, 1, "S9"]
+         for t, v in zip(times, [2.0, 2.0, 2.5, 3.0, 0.0, 0.4, 0.3], strict=True)],
+        columns=["time", "value", "quality", "sensor"],
+    )  # fmt: skip
+    out, unchanged = mod.counter_to_increments(raw, max_quality=1)
+    assert unchanged == []
+    # First reading is the baseline; a fall to 0 is a reset; a fall to 0.3 is a
+    # reset with 0.3 mm of new rain.
+    np.testing.assert_allclose(out["value"].to_numpy(), [0.0, 0.5, 0.5, 0.0, 0.4, 0.3])
+
+
+def test_te_station_daily_rain_from_running_total(mod, tmp_path, capsys):
+    baseline = five_min("2024-12-31", "2025-01-01")
+    day1 = five_min("2025-01-01", "2025-01-02")
+    day2 = five_min("2025-01-02", "2025-01-03")
+    times = baseline.append(day1).append(day2)
+    rain = np.zeros(len(times))
+    rain[: len(baseline)][100:150] = 0.1  # 5 mm on the baseline day (counter carries it)
+    rain[len(baseline) : len(baseline) + len(day1)][60:120] = 0.2  # 12 mm on day 1
+    rain[len(baseline) + len(day1) :][10:40] = 0.1  # 3 mm on day 2, after a reset
+    counter = running_total(times, rain, reset_after=len(baseline) + len(day1))
+    api = FakeAPI({("TE00017", "pr"): counter})
+
+    ds, _ = run(mod, api, tmp_path, "--station", "TE00017", "--start-time", "2025-01-01",
+                "--end-time", "2025-01-02", "-v", "precip", "--day-boundary", "utc")  # fmt: skip
+    np.testing.assert_allclose(ds["precip"].values.ravel(), [12.0, 3.0], atol=1e-6)
+    assert ds.attrs["tahmo_rain_counter_stations"] == "TE00017"
+    assert "running event total" in ds["precip"].attrs["comment"]
+    # One extra day is fetched as the baseline for the first reading.
+    assert api.requests[0][1]["start"] == "2024-12-31T00:00:00Z"
+    assert "Converted Ecowitt running-total rain" in capsys.readouterr().err
+
+
+def test_te_coverage_counts_hours_with_a_reading(mod, tmp_path):
+    # Readings every 5 min in the morning, every 30 min after noon: 168 of 288
+    # samples, but every hour has a reading, so no rain is lost.
+    times = five_min("2024-12-31T23:00", "2025-01-01T12:00").append(
+        pd.date_range("2025-01-01T12:30", "2025-01-02T00:00", freq="30min")
+    )
+    rain = np.where((times > pd.Timestamp("2025-01-01T13:00")) & (times <= pd.Timestamp(
+        "2025-01-01T18:00")), 0.5, 0.0)  # fmt: skip
+    rain[5:60] = 0.05  # morning drizzle so the series has enough rises to judge
+    api = FakeAPI({("TE00017", "pr"): running_total(times, rain, start=1.0)})
+
+    ds, _ = run(mod, api, tmp_path, "--station", "TE00017", "--start-time", "2025-01-01",
+                "--end-time", "2025-01-01", "-v", "precip", "--day-boundary", "utc")  # fmt: skip
+    expected = rain[(times > pd.Timestamp("2025-01-01")) & (times <= pd.Timestamp("2025-01-02"))]
+    assert float(ds["precip"].values.ravel()[0]) == pytest.approx(expected.sum())
+
+
+def test_te_station_with_per_interval_rain_is_left_alone(mod, tmp_path, capsys):
+    times = five_min("2025-01-01", "2025-01-02")
+    pattern = np.tile([0.0, 0.2, 0.4, 0.1, 0.0, 0.3], len(times) // 6)
+    api = FakeAPI({("TE00017", "pr"): [[t, 1, "S9", v] for t, v in zip(times, pattern,
+                                                                       strict=True)]})  # fmt: skip
+    ds, _ = run(mod, api, tmp_path, "--station", "TE00017", "--start-time", "2025-01-01",
+                "--end-time", "2025-01-01", "-v", "precip", "--day-boundary", "utc")  # fmt: skip
+    assert float(ds["precip"].values.ravel()[0]) == pytest.approx(pattern.sum())
+    assert "tahmo_rain_counter_stations" not in ds.attrs
+    assert "does not behave like a running total" in capsys.readouterr().err
+
+
+def test_te_station_other_variables_unchanged(mod, tmp_path):
+    times = five_min("2025-01-01", "2025-01-02")
+    api = FakeAPI({("TE00017", "te"): rows(times, 21.0)})
+    ds, _ = run(mod, api, tmp_path, "--station", "TE00017", "--start-time", "2025-01-01",
+                "--end-time", "2025-01-01", "-v", "temperature", "--day-boundary", "utc")  # fmt: skip
+    assert float(ds["temperature"].values.ravel()[0]) == pytest.approx(21.0)
+    assert api.requests[0][1]["start"] == "2025-01-01T00:00:00Z"  # no baseline day
