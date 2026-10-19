@@ -73,6 +73,28 @@ API units are passed through except:
 - `pr` is mm per logger interval. The skill sums it per bin and writes a
   `mm day-1` rate.
 
+## ARCUS (Ecowitt, `TE…`) stations
+
+ARCUS stations are ingested by the Ecowitt adapter (`tahmoadapterecowitt`),
+which maps Ecowitt API fields onto TAHMO shortcodes: `te` ← outdoor
+temperature (°C), `rh` ← outdoor humidity × 0.01 (a 0–1 fraction, as for TA
+stations), `ra` ← solar (W/m²), `ws`/`wg`/`wd` ← wind (m/s, degrees), and
+`pr` ← `rainfall.event`. Only `pr` differs in meaning:
+
+- `rainfall.event` is Ecowitt's "Event Rain" counter in mm. It rises while it
+  rains, holds its value, and resets to 0 some time after the rain stops
+  (Ecowitt: when the last 24 hours' rain is under 2.0 mm).
+- Rain in an interval is the increase since the previous reading. A fall is a
+  reset, so the new value is the rain since the reset.
+- A counter rarely falls except by resetting. An ATMOS 41 gauge falls after
+  39–89% of positive readings (45 stations checked); TE stations fell after
+  12% or fewer. The skill treats a TE sensor as a counter unless at least 30
+  positive readings show more than 10% falls (or 5% falls to a non-zero value).
+
+The same conversion is used by the ARCUS dashboard
+(`arcus/apps/core/rain_counter.py`) and the TAHMO agentic assistant
+(`tahmo_client/counter_rain.py`).
+
 ## Variable catalogue (API shortcodes)
 
 Meteorological: `pr` precipitation (mm), `te` air temperature (°C), `rh` relative

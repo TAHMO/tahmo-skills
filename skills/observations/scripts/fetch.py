@@ -39,7 +39,7 @@ from weather_skills_core.standard_utils import apply_write_encoding, require_env
 from weather_skills_core.units import precip_amounts_to_rates, stamp_data_interval
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.1"
+_SKILL_VERSION = "0.1.2"
 
 API_BASE_URL = "https://datahub.tahmo.org"
 STATIONS_PATH = "services/assets/v2/stations"
@@ -460,6 +460,81 @@ def clean_samples(raw: pd.DataFrame, max_quality: int, scale: float) -> pd.Serie
     return pd.Series(df["value"].astype(float).to_numpy() * scale, index=df["time"].to_numpy())
 
 
+# ARCUS stations (codes starting with TE) use Ecowitt equipment. The Ecowitt
+# ingestion adapter stores the gauge's "event rain" as pr: a running total in mm
+# that rises while it rains, holds between readings, and resets to 0 after a dry
+# spell. Summed like an ATMOS 41's per-interval amounts it gives hundreds of mm
+# a day, so it is turned into rain per reading first. Checked against the TA
+# station at the same site, the increments agree to within roughly 5-15%.
+COUNTER_STATION_PREFIXES = ("TE",)
+COUNTER_SHORTCODE = "pr"
+# The first reading has nothing before it to compare with, so one more day is
+# fetched as its baseline and trimmed afterwards.
+COUNTER_BASELINE = timedelta(days=1)
+# A running total hardly ever falls except by resetting to 0. A per-interval
+# gauge (ATMOS 41) falls after most positive readings (39-89% on 45 stations);
+# every TE station checked had 12% or less.
+_MIN_POSITIVE_TRANSITIONS = 30
+_MAX_FALL_SHARE = 0.10
+_MAX_NONZERO_FALL_SHARE = 0.05
+_MIN_RISES = 3
+
+
+def is_counter_station(code: str) -> bool:
+    """Whether this station type reports ``pr`` as an Ecowitt running event total."""
+    return str(code).upper().startswith(COUNTER_STATION_PREFIXES)
+
+
+def looks_like_counter(values) -> bool | None:
+    """True if readings (in time order) behave like a running total, False if
+    they are clearly rain per interval, None if there is too little rain to tell."""
+    values = np.asarray(values, dtype=float)
+    values = values[~np.isnan(values)]
+    before, after = values[:-1], values[1:]
+    positive = before > 0
+    n_positive = int(positive.sum())
+    if n_positive < _MIN_POSITIVE_TRANSITIONS or int((after > before).sum()) < _MIN_RISES:
+        return None
+    falls = positive & (after < before)
+    nonzero_falls = falls & (after > 0)
+    return bool(
+        falls.sum() / n_positive <= _MAX_FALL_SHARE
+        and nonzero_falls.sum() / n_positive <= _MAX_NONZERO_FALL_SHARE
+    )
+
+
+def counter_to_increments(raw: pd.DataFrame, max_quality: int) -> tuple[pd.DataFrame, list[str]]:
+    """Turn each sensor's running total into rain per reading.
+
+    A rise is the rain since the previous reading; a fall is a reset, so the new
+    value is the rain since the reset. Each sensor's first reading is only the
+    baseline and is dropped. A sensor whose readings clearly are rain per
+    interval is left unchanged: the station type is a prior, the readings have
+    the last word. Returns the converted frame and the sensors left unchanged.
+    """
+    if raw.empty:
+        return raw, []
+    df = raw.dropna(subset=["value"]).copy()
+    df["quality"] = pd.to_numeric(df["quality"], errors="coerce")
+    df = df[df["quality"] <= max_quality]
+    df["time"] = pd.to_datetime(df["time"], utc=True, format="ISO8601")
+    df["sensor"] = df["sensor"].fillna("").astype(str)
+    out, unchanged = [], []
+    for sensor, group in df.groupby("sensor", sort=True):
+        group = group.sort_values("time").drop_duplicates("time", keep="last")
+        values = group["value"].astype(float)
+        if looks_like_counter(values.to_numpy()) is False:
+            unchanged.append(sensor)
+            out.append(group)
+            continue
+        diff = values.diff()
+        group = group.assign(value=diff.where(diff >= 0, values).clip(lower=0.0))
+        out.append(group.iloc[1:])
+    if not out:
+        return _empty_measurements(), unchanged
+    return pd.concat(out, ignore_index=True), unchanged
+
+
 def native_interval(index: pd.DatetimeIndex) -> pd.Timedelta | None:
     """Most common positive spacing between samples (the logger interval)."""
     if len(index) < 2:
@@ -486,6 +561,7 @@ def aggregate(
     day_start_hour: int,
     min_coverage: float,
     interval: pd.Timedelta | None,
+    counter: bool = False,
 ) -> pd.Series:
     """Reduce samples into hourly/daily bins with a completeness check.
 
@@ -494,6 +570,10 @@ def aggregate(
     bins the start is local midnight (``zone``) plus ``day_start_hour``, and
     the label is that local calendar date. Bins with fewer than
     ``min_coverage`` of the expected samples are NaN.
+
+    With ``counter`` (rain derived from an Ecowitt running total) a missing
+    reading loses no rain, because the next reading carries it, so coverage is
+    the share of the bin's hours that have a reading.
     """
     if samples.empty:
         return pd.Series(dtype=float)
@@ -509,6 +589,10 @@ def aggregate(
         values = grouped.agg(lambda s: _circmean(s.to_numpy()))
     else:
         values = grouped.agg(reducer)
+    if counter:
+        hours = pd.Series(shifted.floor("h"), index=keys).groupby(level=0).nunique()
+        coverage = (hours / (period / pd.Timedelta(hours=1))).clip(upper=1.0)
+        return values.where(coverage >= min_coverage)
     counts = grouped.count()
     if interval is None or interval <= pd.Timedelta(0):
         expected = 1.0
@@ -789,11 +873,18 @@ def fetch(
     }
 
     shortcodes = list(dict.fromkeys(VARIABLES[n].shortcode for n in names))
+
+    def fetch_window(code, sc):
+        lo, hi = windows[code]
+        if sc == COUNTER_SHORTCODE and is_counter_station(code):
+            lo -= COUNTER_BASELINE  # baseline for the first running-total reading
+        return lo, hi
+
     tasks = [
         (code, sc, lo, hi)
         for code in sel.index
         for sc in shortcodes
-        for lo, hi in chunk_window(*windows[code])
+        for lo, hi in chunk_window(*fetch_window(code, sc))
     ]
     print(
         f"Fetching {len(shortcodes)} variable(s) for {len(sel)} station(s) "
@@ -829,6 +920,7 @@ def fetch(
     freq = "D" if daily else "h"
     series_by_var: dict[str, dict[str, pd.Series]] = {n: {} for n in names}
     intervals: set[pd.Timedelta] = set()
+    counter_codes: list[str] = []
     for code in sel.index:
         if code in failed:
             continue
@@ -836,6 +928,18 @@ def fetch(
         for sc in shortcodes:
             frames = [f for f in parts.get((code, sc), []) if not f.empty]
             raw = pd.concat(frames, ignore_index=True) if frames else _empty_measurements()
+            counter = False
+            if sc == COUNTER_SHORTCODE and is_counter_station(code) and not raw.empty:
+                raw, unchanged = counter_to_increments(raw, max_quality)
+                for sensor in unchanged:
+                    print(
+                        f"{code}: rain sensor {sensor or '?'} does not behave like a running "
+                        "total; left as rain per reading",
+                        file=sys.stderr,
+                    )
+                counter = not raw.empty and not unchanged
+                if counter:
+                    counter_codes.append(code)
             for name in names:
                 spec = VARIABLES[name]
                 if spec.shortcode != sc:
@@ -860,7 +964,15 @@ def fetch(
                     day_start_hour=day_start_hour if daily else 0,
                     min_coverage=min_coverage,
                     interval=native_interval(pd.DatetimeIndex(samples.index)),
+                    counter=counter,
                 )
+
+    if counter_codes:
+        print(
+            f"Converted Ecowitt running-total rain to rain per reading for: "
+            f"{', '.join(sorted(counter_codes))}",
+            file=sys.stderr,
+        )
 
     # Drop station-variables with no surviving values; drop empty variables.
     for name in names:
@@ -932,6 +1044,13 @@ def fetch(
     )
     if resolution != "native":
         ds.attrs["tahmo_min_coverage"] = float(min_coverage)
+    reported_counters = sorted(set(counter_codes) & set(ds["station_id"].values.tolist()))
+    if reported_counters and "precip" in ds:
+        ds.attrs["tahmo_rain_counter_stations"] = " ".join(reported_counters)
+        ds["precip"].attrs["comment"] = (
+            "For stations in tahmo_rain_counter_stations (Ecowitt), precip is derived "
+            "from the gauge's running event total as the increase between readings."
+        )
     if daily:
         ds.attrs["tahmo_day_boundary"] = day_boundary
         ds.attrs["tahmo_day_start_hour"] = np.int8(day_start_hour)

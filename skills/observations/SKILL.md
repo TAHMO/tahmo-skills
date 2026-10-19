@@ -161,6 +161,27 @@ Global attrs record the settings (`tahmo_resolution`, `tahmo_min_coverage`,
 `tahmo_day_boundary`, …), `weather_skills_source=tahmo`, and
 `featureType=timeSeries`.
 
+## ARCUS (Ecowitt) stations
+
+Stations whose codes start with `TE` are ARCUS stations with Ecowitt
+equipment. TAHMO stores their rain (`pr`) as Ecowitt's **event rain**: a
+running total in mm that rises while it rains, holds between readings, and
+resets to 0 after a dry spell. Summing it like other stations' rain would give
+hundreds of mm a day, so for these stations the skill:
+
+- converts each rain sensor's readings to rain per reading (the increase since
+  the previous reading; a fall is a reset, so the new value is the rain since
+  the reset), fetching one extra day as the baseline for the first reading;
+- judges a day's completeness by the share of hours with a reading, since a
+  missing reading loses no rain (the next one carries it);
+- leaves a sensor unchanged, with a note on stderr, if its readings clearly are
+  rain per interval rather than a running total.
+
+Converted stations are listed in the `tahmo_rain_counter_stations` global attr.
+Other TE variables need no conversion. Against the TA station at the same site,
+converted TE rain typically agrees within 5–15%, the Ecowitt gauge reading a
+little higher.
+
 ## Failures
 
 - Missing or rejected credentials → exit 2 with a message; nothing is written.
