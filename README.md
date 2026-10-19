@@ -1,25 +1,38 @@
 # TAHMO Skills
 
-Agent skills for data from the
+Agent skills for the
 [Trans-African Hydro-Meteorological Observatory (TAHMO)](https://tahmo.org)
-station network. The skills are built on
+station network: station observations, and the operational systems behind the
+network.
+
+The observation skills are built on
 [`weather-skills-core`](https://github.com/rhiza-research/weather-skills-core)
 (pinned to `main`), so their outputs are standard weather-skills Zarr stores
 that compose with the [weather-skills](https://github.com/rhiza-research/weather-skills)
-transforms and plotters (`aggregate-temporal`, `plot-compare`, …).
+transforms and plotters (`aggregate-temporal`, `plot-compare`, …). The
+operations skills print JSON.
 
 ## Skills
+
+### Observations
 
 | Skill | Role |
 | --- | --- |
 | [`observations`](skills/observations/) | List accessible stations, and fetch quality-controlled observations (rain, temperature incl. max/min, humidity, pressure, wind, radiation, soil) at daily, hourly, or native 5-min resolution into a point_obs Zarr |
 | [`observations-satellite-qc`](skills/observations-satellite-qc/) | Remove daily station rainfall that disagrees with NASA IMERG Early satellite estimates (absolute-difference, ratio, and wet/dry rules), keeping a per-day flag that records why |
 
+### Operations
+
+| Skill | Role |
+| --- | --- |
+| [`tickets`](skills/tickets/) | Query the TAHMO ticketing system: list and filter tickets, look one up by number, a station's ticket history, or counts by assignee, country, month, label, and more |
+
 ## Quick start
 
 ```bash
 export TAHMO_API_USERNAME=...   # your TAHMO API id
 export TAHMO_API_PASSWORD=...   # your TAHMO API secret
+export TICKETING_API_TOKEN=...  # your TAHMO ticketing API key
 
 uv sync --group dev
 uv run pytest
@@ -36,6 +49,10 @@ uv run skills/observations/scripts/fetch.py --probe-latest --country KE
 
 # Remove days that disagree with IMERG satellite rainfall
 uv run skills/observations-satellite-qc/scripts/observations_satellite_qc.py -i kenya.zarr -o kenya_clean.zarr
+
+# Open tickets per person, and one ticket in full
+uv run skills/tickets/scripts/tickets.py summary --status open --group-by assignee
+uv run skills/tickets/scripts/tickets.py get 1234
 ```
 
 ## Install as a Claude plugin
