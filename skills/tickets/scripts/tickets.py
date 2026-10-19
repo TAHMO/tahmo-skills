@@ -24,7 +24,7 @@ from datetime import UTC, date, datetime
 from statistics import median
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.0"
+_SKILL_VERSION = "0.1.1"
 
 DEFAULT_BASE_URL = "https://tickets.tahmo.org/api"
 HTTP_TIMEOUT = 120  # listing every issue takes about half a minute
