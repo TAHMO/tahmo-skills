@@ -24,12 +24,11 @@ dev = [
     "cftime",
     "cf_xarray",
     "pint-xarray>=0.6",
-    "weather-skills-core",
+    "weather-skills-core>=0.3.6",
 ]
 
 [tool.uv.sources]
 skills-runner = { git = "https://github.com/tescalada/skills-runner" }
-weather-skills-core = { git = "https://github.com/rhiza-research/weather-skills-core", branch = "main" }
 
 [tool.pytest.ini_options]
 testpaths = ["skills"]
