@@ -6,8 +6,8 @@ station network: station observations, and the operational systems behind the
 network.
 
 The observation skills are built on
-[`weather-skills-core`](https://github.com/rhiza-research/weather-skills-core)
-(pinned to `main`), so their outputs are standard weather-skills Zarr stores
+[`weather-skills-core`](https://pypi.org/project/weather-skills-core/)
+(installed from PyPI), so their outputs are standard weather-skills Zarr stores
 that compose with the [weather-skills](https://github.com/rhiza-research/weather-skills)
 transforms and plotters (`aggregate-temporal`, `plot-compare`, …). The
 operations skills print JSON.
