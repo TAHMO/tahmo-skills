@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
-#   "weather-skills-core @ git+https://github.com/rhiza-research/weather-skills-core@main",
+#   "weather-skills-core>=0.3.6",
 #   "cf_xarray",
 #   "cftime",
 #   "numpy",
@@ -39,7 +39,7 @@ from weather_skills_core.standard_utils import apply_write_encoding, require_env
 from weather_skills_core.units import precip_amounts_to_rates, stamp_data_interval
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.2"
+_SKILL_VERSION = "0.1.3"
 
 API_BASE_URL = "https://datahub.tahmo.org"
 STATIONS_PATH = "services/assets/v2/stations"

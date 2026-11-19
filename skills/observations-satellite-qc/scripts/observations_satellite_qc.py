@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
-#   "weather-skills-core @ git+https://github.com/rhiza-research/weather-skills-core@main",
+#   "weather-skills-core>=0.3.6",
 #   "cf_xarray",
 #   "cftime",
 #   "numpy",
@@ -35,7 +35,7 @@ from weather_skills_core import DataError, Dataset, UsageError, weather_skill
 from weather_skills_core.units import parse_aggregation_period, units_equal
 
 # Auto-populated by the version-bump CI workflow. Do not edit manually.
-_SKILL_VERSION = "0.1.1"
+_SKILL_VERSION = "0.1.2"
 
 DYNAMICAL_URL = "https://api.dynamical.org/v1/analyses"
 IMERG_PRODUCT = "nasa-imerg-analysis-early"
