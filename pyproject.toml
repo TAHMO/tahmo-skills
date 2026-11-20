@@ -24,7 +24,7 @@ dev = [
     "cftime",
     "cf_xarray",
     "pint-xarray>=0.6",
-    "weather-skills-core>=0.3.6",
+    "weather-skills-core>=0.4.0",
 ]
 
 [tool.uv.sources]
